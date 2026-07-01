@@ -12,6 +12,7 @@
     <AssemblyName>KeySwitcher</AssemblyName>
     <RootNamespace>KeySwitcher</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <Version>0.1.0</Version>
   </PropertyGroup>
 
@@ -28,6 +29,7 @@
     <EmbeddedResource Include="Dictionaries\resources\ru.txt" />
     <EmbeddedResource Include="Dictionaries\resources\uk.txt" />
     <EmbeddedResource Include="Dictionaries\resources\en.txt" />
+    <EmbeddedResource Include="app.ico" LogicalName="KeySwitcher.app.ico" />
   </ItemGroup>
 
 </Project>

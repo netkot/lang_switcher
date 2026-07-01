@@ -18,6 +18,7 @@ public sealed class TrayAppContext : ApplicationContext
     private readonly LowLevelKeyboardHook _hook = new();
 
     private readonly NotifyIcon _tray;
+    private readonly Icon? _trayIcon;
     private readonly ToolStripMenuItem _autoModeItem;
     private readonly ToolStripMenuItem _wordHintItem;
     private readonly ToolStripMenuItem _selectionHintItem;
@@ -55,9 +56,10 @@ public sealed class TrayAppContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Выход", null, OnExit));
 
+        _trayIcon = LoadAppIcon();
         _tray = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = _trayIcon ?? SystemIcons.Application,
             Text = "KeySwitcher",
             Visible = true,
             ContextMenuStrip = menu,
@@ -85,6 +87,22 @@ public sealed class TrayAppContext : ApplicationContext
             RefreshHotkeyHints();
         };
         form.ShowDialog();
+    }
+
+    /// <summary>Загружает встроенную иконку приложения нужного для трея размера.</summary>
+    private static Icon? LoadAppIcon()
+    {
+        try
+        {
+            using Stream? stream = System.Reflection.Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceStream("KeySwitcher.app.ico");
+            return stream is null ? null : new Icon(stream, SystemInformation.SmallIconSize);
+        }
+        catch
+        {
+            return null; // повреждённый/отсутствующий ресурс — используем системную иконку
+        }
     }
 
     private void RefreshHotkeyHints()
@@ -257,6 +275,7 @@ public sealed class TrayAppContext : ApplicationContext
             _hook.Dispose();
             _tray.Visible = false;
             _tray.Dispose();
+            _trayIcon?.Dispose();
             _sync.Dispose();
         }
         base.Dispose(disposing);
