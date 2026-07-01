@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>KeySwitcher</AssemblyName>
+    <RootNamespace>KeySwitcher</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Dictionaries\resources\ru.txt" />
+    <EmbeddedResource Include="Dictionaries\resources\uk.txt" />
+    <EmbeddedResource Include="Dictionaries\resources\en.txt" />
+  </ItemGroup>
+
+</Project>
