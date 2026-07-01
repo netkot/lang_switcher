@@ -21,6 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="KeySwitcher.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Dictionaries\resources\ru.txt" />
     <EmbeddedResource Include="Dictionaries\resources\uk.txt" />
     <EmbeddedResource Include="Dictionaries\resources\en.txt" />
