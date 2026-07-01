@@ -13,11 +13,20 @@ public sealed class ManualSwitcher
     private readonly WordBuffer _buffer;
     private readonly LayoutDetector _detector;
 
+    // Последняя выполненная замена — для однократной отмены (Undo).
+    private Replacement? _lastReplacement;
+
+    /// <summary>Данные для отмены последней замены слова у курсора.</summary>
+    private readonly record struct Replacement(
+        string Original, string Converted, Language SourceLang, string Trailing);
+
     public ManualSwitcher(WordBuffer buffer, LayoutDetector detector)
     {
         _buffer = buffer;
         _detector = detector;
     }
+
+    public bool CanUndo => _lastReplacement is not null;
 
     /// <summary>Break: переписать активное слово в наиболее правдоподобной раскладке.</summary>
     public void ConvertLastWord()
@@ -35,7 +44,26 @@ public sealed class ManualSwitcher
 
         LayoutManager.SwitchTo(target);
         _buffer.ReplaceActive(converted, target);
+        _lastReplacement = new Replacement(active.Text, converted, active.Language, active.Trailing);
     }
+
+    /// <summary>
+    /// Отменяет последнюю замену: возвращает у курсора исходное слово и прежнюю раскладку.
+    /// Работает, только если после замены не было нового ввода (см. <see cref="ClearUndo"/>).
+    /// </summary>
+    public void UndoLast()
+    {
+        if (_lastReplacement is not { } r) return;
+
+        InputSender.SendBackspaces(r.Converted.Length + r.Trailing.Length);
+        InputSender.SendText(r.Original + r.Trailing);
+        LayoutManager.SwitchTo(r.SourceLang);
+        _buffer.ReplaceActive(r.Original, r.SourceLang);
+        _lastReplacement = null;
+    }
+
+    /// <summary>Сбрасывает возможность отмены (вызывается при новом вводе пользователя).</summary>
+    public void ClearUndo() => _lastReplacement = null;
 
     /// <summary>
     /// Авто-режим: вызывается на клавише-разделителе. При уверенной детекции конвертирует
@@ -55,6 +83,8 @@ public sealed class ManualSwitcher
                 LayoutManager.SwitchTo(result.Target);
                 _buffer.ReplaceActive(converted, result.Target);
                 _buffer.FeedSeparator(separator);
+                _lastReplacement = new Replacement(
+                    active.Text, converted, active.Language, separator.ToString());
                 return;
             }
         }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using KeySwitcher.Core;
 
 namespace KeySwitcher.Config;
 
@@ -8,6 +9,18 @@ public sealed class Settings
 {
     /// <summary>Автоматическая замена «на лету». В MVP по умолчанию выключено.</summary>
     public bool AutoModeEnabled { get; set; }
+
+    /// <summary>
+    /// Языки, участвующие в детекции и конвертации. Позволяет отключить неиспользуемый
+    /// язык (напр. украинский), чтобы он не мешал распознаванию, — и служит точкой
+    /// расширения при добавлении новых языков. По умолчанию — все поддерживаемые.
+    /// </summary>
+    public List<Language> EnabledLanguages { get; set; } =
+        Enum.GetValues<Language>().ToList();
+
+    /// <summary>Включён ли язык (при пустом списке считаем включёнными все).</summary>
+    public bool IsLanguageEnabled(Language lang) =>
+        EnabledLanguages is null || EnabledLanguages.Count == 0 || EnabledLanguages.Contains(lang);
 
     [JsonIgnore]
     public static string FilePath { get; } = Path.Combine(

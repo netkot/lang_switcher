@@ -57,6 +57,16 @@ public sealed class LayoutDetector
         _ngram = ngram;
     }
 
+    /// <summary>
+    /// Языки, доступные как цель конвертации. Меняется из настроек на лету.
+    /// Пустой набор трактуется как «все языки».
+    /// </summary>
+    public ISet<Language> EnabledLanguages { get; set; } =
+        new HashSet<Language>(Enum.GetValues<Language>());
+
+    private bool IsEnabled(Language lang) =>
+        EnabledLanguages.Count == 0 || EnabledLanguages.Contains(lang);
+
     /// <summary>Решение для авто-режима: конвертировать ли и на какой язык.</summary>
     public DetectionResult Detect(string word, Language current)
     {
@@ -69,6 +79,7 @@ public sealed class LayoutDetector
 
         // 2. Ищем словарное совпадение среди конвертаций.
         var ranked = RankCandidates(core, current);
+        if (ranked.Count == 0) return DetectionResult.NoChange; // все прочие языки отключены
         var top = ranked[0];
 
         if (top.dictHit)
@@ -90,7 +101,7 @@ public sealed class LayoutDetector
     {
         string core = ExtractLetters(word);
         var ranked = RankCandidates(core.Length > 0 ? core : word, current);
-        return ranked[0].language;
+        return ranked.Count > 0 ? ranked[0].language : current;
     }
 
     /// <summary>Кандидаты-конвертации, отсортированные по убыванию правдоподобия.</summary>
@@ -100,6 +111,7 @@ public sealed class LayoutDetector
         var list = new List<(Language language, string text, bool dictHit, double score)>();
         foreach (var (lang, text) in LayoutConverter.ConvertToOthers(word, current))
         {
+            if (!IsEnabled(lang)) continue; // отключённый язык не предлагаем
             bool dictHit = _dictionary.Contains(ExtractLetters(text), lang);
             double score = dictHit ? 1000.0 : Plausibility(text, lang);
             list.Add((lang, text, dictHit, score));

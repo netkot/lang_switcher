@@ -75,4 +75,22 @@ public class LayoutDetectorTests
         Assert.Equal(Language.Russian, d.PickManualTarget("ghbdtn", Language.English));
         Assert.Equal(Language.English, d.PickManualTarget("руддщ", Language.Russian));
     }
+
+    [Fact]
+    public void Detect_DisabledLanguageIsNeverSuggested()
+    {
+        var d = CreateDetector();
+        d.EnabledLanguages = new HashSet<Language> { Language.English, Language.Russian };
+        // "ghbdsn" словарно совпадает только с украинским (привіт), но UK отключён.
+        var r = d.Detect("ghbdsn", Language.English);
+        Assert.NotEqual(Language.Ukrainian, r.Target);
+    }
+
+    [Fact]
+    public void PickManualTarget_SkipsDisabledLanguage()
+    {
+        var d = CreateDetector();
+        d.EnabledLanguages = new HashSet<Language> { Language.English, Language.Russian };
+        Assert.NotEqual(Language.Ukrainian, d.PickManualTarget("ghbdsn", Language.English));
+    }
 }

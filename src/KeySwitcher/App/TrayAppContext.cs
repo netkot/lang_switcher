@@ -29,6 +29,7 @@ public sealed class TrayAppContext : ApplicationContext
         WordDictionary dictionary = WordDictionary.LoadEmbedded();
         _detector = new LayoutDetector(dictionary, NgramModel.Build(dictionary));
         _switcher = new ManualSwitcher(_buffer, _detector);
+        ApplyEnabledLanguages();
 
         _ = _sync.Handle; // принудительно создаём хендл для BeginInvoke
 
@@ -40,6 +41,8 @@ public sealed class TrayAppContext : ApplicationContext
 
         var menu = new ContextMenuStrip();
         menu.Items.Add(_autoModeItem);
+        menu.Items.Add(new ToolStripMenuItem("Отменить последнюю замену", null, OnUndo));
+        menu.Items.Add(new ToolStripMenuItem("Настройки…", null, OnOpenSettings));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Break — сменить раскладку слова") { Enabled = false });
         menu.Items.Add(new ToolStripMenuItem("Shift+Break — конвертировать выделение") { Enabled = false });
@@ -64,6 +67,24 @@ public sealed class TrayAppContext : ApplicationContext
         _settings.Save();
     }
 
+    private void OnUndo(object? sender, EventArgs e) => Defer(() => _switcher.UndoLast());
+
+    private void OnOpenSettings(object? sender, EventArgs e)
+    {
+        using var form = new SettingsForm(_settings);
+        form.Saved += () =>
+        {
+            _autoModeItem.Checked = _settings.AutoModeEnabled;
+            ApplyEnabledLanguages();
+        };
+        form.ShowDialog();
+    }
+
+    /// <summary>Переносит набор включённых языков из настроек в детектор.</summary>
+    private void ApplyEnabledLanguages() =>
+        _detector.EnabledLanguages = new HashSet<Language>(
+            _settings.EnabledLanguages ?? Enum.GetValues<Language>().ToList());
+
     private void OnKeyIntercepted(object? sender, KeyboardHookEventArgs e)
     {
         if (e.IsInjected) return;
@@ -84,6 +105,10 @@ public sealed class TrayAppContext : ApplicationContext
         }
 
         if (!e.IsKeyDown) return;
+
+        // Любой новый ввод (кроме Break/Shift+Break выше) делает прошлую замену
+        // неотменяемой: курсор уже не там. Отложенные конвертации ниже зададут undo заново.
+        _switcher.ClearUndo();
 
         int vk = e.VkCode;
 
