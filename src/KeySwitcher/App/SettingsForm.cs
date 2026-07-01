@@ -6,13 +6,16 @@ using KeySwitcher.Interop;
 
 namespace KeySwitcher.App;
 
-/// <summary>Окно настроек: авто-режим, автозапуск, набор языков, папка словарей.</summary>
+/// <summary>Окно настроек: авто-режим, автозапуск, языки, горячие клавиши, папка словарей.</summary>
 public sealed class SettingsForm : Form
 {
     private readonly Settings _settings;
     private readonly CheckBox _autoMode;
     private readonly CheckBox _autostart;
     private readonly Dictionary<Language, CheckBox> _langChecks = new();
+    private readonly HotkeyBox _wordHotkey = new();
+    private readonly HotkeyBox _selectionHotkey = new();
+    private readonly HotkeyBox _undoHotkey = new();
 
     /// <summary>Вызывается после сохранения — чтобы применить настройки на лету.</summary>
     public event Action? Saved;
@@ -27,7 +30,7 @@ public sealed class SettingsForm : Form
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(340, 300);
+        ClientSize = new Size(360, 470);
 
         _autoMode = new CheckBox
         {
@@ -49,7 +52,7 @@ public sealed class SettingsForm : Form
         {
             Text = "Языки",
             Location = new Point(16, 80),
-            Size = new Size(308, 110),
+            Size = new Size(328, 110),
         };
         int y = 24;
         foreach (Language lang in Enum.GetValues<Language>())
@@ -66,12 +69,13 @@ public sealed class SettingsForm : Form
             y += 26;
         }
 
+        var hotkeyGroup = BuildHotkeyGroup();
+
         var dictButton = new Button
         {
             Text = "Папка словарей…",
-            Location = new Point(16, 200),
-            Size = new Size(140, 28),
-            AutoSize = false,
+            Location = new Point(16, 370),
+            Size = new Size(150, 28),
         };
         dictButton.Click += (_, _) => OpenDictionaryFolder();
 
@@ -79,7 +83,7 @@ public sealed class SettingsForm : Form
         {
             Text = "OK",
             DialogResult = DialogResult.OK,
-            Location = new Point(148, 250),
+            Location = new Point(168, 420),
             Size = new Size(84, 30),
         };
         ok.Click += (_, _) => Apply();
@@ -88,13 +92,44 @@ public sealed class SettingsForm : Form
         {
             Text = "Отмена",
             DialogResult = DialogResult.Cancel,
-            Location = new Point(240, 250),
+            Location = new Point(260, 420),
             Size = new Size(84, 30),
         };
 
-        Controls.AddRange(new Control[] { _autoMode, _autostart, langGroup, dictButton, ok, cancel });
+        Controls.AddRange(new Control[]
+            { _autoMode, _autostart, langGroup, hotkeyGroup, dictButton, ok, cancel });
         AcceptButton = ok;
         CancelButton = cancel;
+    }
+
+    private GroupBox BuildHotkeyGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "Горячие клавиши (Del — очистить)",
+            Location = new Point(16, 200),
+            Size = new Size(328, 150),
+        };
+
+        AddHotkeyRow(group, "Сменить раскладку слова:", _wordHotkey, _settings.ConvertWordHotkey, 26);
+        AddHotkeyRow(group, "Конвертировать выделение:", _selectionHotkey, _settings.ConvertSelectionHotkey, 62);
+        AddHotkeyRow(group, "Отменить замену:", _undoHotkey, _settings.UndoHotkey, 98);
+
+        return group;
+    }
+
+    private static void AddHotkeyRow(GroupBox group, string caption, HotkeyBox box, Hotkey value, int y)
+    {
+        group.Controls.Add(new Label
+        {
+            Text = caption,
+            Location = new Point(12, y + 3),
+            AutoSize = true,
+        });
+        box.Value = value;
+        box.Location = new Point(180, y);
+        box.Size = new Size(136, 24);
+        group.Controls.Add(box);
     }
 
     private void Apply()
@@ -107,6 +142,10 @@ public sealed class SettingsForm : Form
         // Полностью пустой список запрещаем — иначе конвертировать некуда.
         if (_settings.EnabledLanguages.Count == 0)
             _settings.EnabledLanguages = Enum.GetValues<Language>().ToList();
+
+        _settings.ConvertWordHotkey = _wordHotkey.Value;
+        _settings.ConvertSelectionHotkey = _selectionHotkey.Value;
+        _settings.UndoHotkey = _undoHotkey.Value;
 
         _settings.Save();
         AutostartManager.Set(_autostart.Checked);

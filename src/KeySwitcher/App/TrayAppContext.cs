@@ -19,6 +19,8 @@ public sealed class TrayAppContext : ApplicationContext
 
     private readonly NotifyIcon _tray;
     private readonly ToolStripMenuItem _autoModeItem;
+    private readonly ToolStripMenuItem _wordHintItem;
+    private readonly ToolStripMenuItem _selectionHintItem;
 
     // Скрытый control — для отложенного выполнения действий после возврата из хука.
     private readonly Control _sync = new();
@@ -39,13 +41,17 @@ public sealed class TrayAppContext : ApplicationContext
             Checked = _settings.AutoModeEnabled,
         };
 
+        _wordHintItem = new ToolStripMenuItem { Enabled = false };
+        _selectionHintItem = new ToolStripMenuItem { Enabled = false };
+        RefreshHotkeyHints();
+
         var menu = new ContextMenuStrip();
         menu.Items.Add(_autoModeItem);
         menu.Items.Add(new ToolStripMenuItem("Отменить последнюю замену", null, OnUndo));
         menu.Items.Add(new ToolStripMenuItem("Настройки…", null, OnOpenSettings));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Break — сменить раскладку слова") { Enabled = false });
-        menu.Items.Add(new ToolStripMenuItem("Shift+Break — конвертировать выделение") { Enabled = false });
+        menu.Items.Add(_wordHintItem);
+        menu.Items.Add(_selectionHintItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Выход", null, OnExit));
 
@@ -76,8 +82,16 @@ public sealed class TrayAppContext : ApplicationContext
         {
             _autoModeItem.Checked = _settings.AutoModeEnabled;
             ApplyEnabledLanguages();
+            RefreshHotkeyHints();
         };
         form.ShowDialog();
+    }
+
+    private void RefreshHotkeyHints()
+    {
+        _wordHintItem.Text = $"{_settings.ConvertWordHotkey.Describe()} — сменить раскладку слова";
+        _selectionHintItem.Text =
+            $"{_settings.ConvertSelectionHotkey.Describe()} — конвертировать выделение";
     }
 
     /// <summary>Переносит набор включённых языков из настроек в детектор.</summary>
@@ -89,20 +103,8 @@ public sealed class TrayAppContext : ApplicationContext
     {
         if (e.IsInjected) return;
 
-        // --- Горячие клавиши Break / Shift+Break ---
-        // Клавиша Pause/Break даёт VK_PAUSE (0x13); с Ctrl — VK_CANCEL (0x03).
-        if (e.VkCode is NativeMethods.VK_PAUSE or 0x03)
-        {
-            e.Suppress = true; // не пропускаем Break в приложение
-            if (e.IsKeyDown)
-            {
-                if (e.ShiftDown)
-                    Defer(() => _switcher.ConvertSelection());
-                else
-                    Defer(() => _switcher.ConvertLastWord());
-            }
-            return;
-        }
+        // --- Настраиваемые горячие клавиши ---
+        if (TryHandleHotkey(e)) return;
 
         if (!e.IsKeyDown) return;
 
@@ -168,6 +170,69 @@ public sealed class TrayAppContext : ApplicationContext
             _buffer.FeedSeparator(c);
         }
     }
+
+    /// <summary>
+    /// Обрабатывает настраиваемые горячие клавиши. Возвращает true, если событие относится
+    /// к клавише-триггеру (и его следует поглотить/не обрабатывать дальше как обычный ввод).
+    /// </summary>
+    private bool TryHandleHotkey(KeyboardHookEventArgs e)
+    {
+        int vk = e.VkCode;
+
+        // Отпускание клавиши-триггера тоже подавляем, чтобы она не «просочилась» в приложение.
+        if (!e.IsKeyDown)
+        {
+            if (IsHotkeyTriggerVk(vk)) { e.Suppress = true; return true; }
+            return false;
+        }
+
+        bool ctrl = e.CtrlDown, shift = e.ShiftDown, alt = e.AltDown;
+
+        if (_settings.ConvertSelectionHotkey.Matches(vk, ctrl, shift, alt))
+        {
+            e.Suppress = true;
+            Defer(() => _switcher.ConvertSelection());
+            return true;
+        }
+
+        if (_settings.ConvertWordHotkey.Matches(vk, ctrl, shift, alt))
+        {
+            e.Suppress = true;
+            // Punto-стиль: свежую замену повторное нажатие отменяет, иначе — конвертируем.
+            Defer(() =>
+            {
+                if (_switcher.CanUndo) _switcher.UndoLast();
+                else _switcher.ConvertLastWord();
+            });
+            return true;
+        }
+
+        if (_settings.UndoHotkey.Matches(vk, ctrl, shift, alt))
+        {
+            e.Suppress = true;
+            Defer(() => _switcher.UndoLast());
+            return true;
+        }
+
+        // Тот же код, но другие модификаторы: для непечатных триггеров (Pause, F-клавиши…)
+        // всё равно поглощаем, чтобы клавиша никогда не попадала в приложение.
+        if (IsHotkeyTriggerVk(vk) && IsNonTypingKey(vk))
+        {
+            e.Suppress = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsHotkeyTriggerVk(int vk) =>
+        _settings.Hotkeys().Any(h => h.IsSet && h.VkCode == vk);
+
+    // Печатные клавиши: буквы/цифры (0x30–0x5A), numpad (0x60–0x6F), OEM-пунктуация (0xBA–0xE2).
+    private static bool IsNonTypingKey(int vk) =>
+        !(vk is >= 0x30 and <= 0x5A) &&
+        !(vk is >= 0x60 and <= 0x6F) &&
+        !(vk is >= 0xBA and <= 0xE2);
 
     private void Defer(Action action) => _sync.BeginInvoke(action);
 

@@ -22,6 +22,26 @@ public sealed class Settings
     public bool IsLanguageEnabled(Language lang) =>
         EnabledLanguages is null || EnabledLanguages.Count == 0 || EnabledLanguages.Contains(lang);
 
+    // ---- Горячие клавиши (настраиваемые) ----
+    // Pause == 0x13 (клавиша Pause/Break).
+
+    /// <summary>Переписать слово в другой раскладке. Повторное нажатие отменяет замену.</summary>
+    public Hotkey ConvertWordHotkey { get; set; } = new(0x13, Ctrl: false, Shift: false, Alt: false);
+
+    /// <summary>Конвертировать выделенный текст.</summary>
+    public Hotkey ConvertSelectionHotkey { get; set; } = new(0x13, Ctrl: false, Shift: true, Alt: false);
+
+    /// <summary>Отдельная клавиша отмены последней замены (по умолчанию не назначена).</summary>
+    public Hotkey UndoHotkey { get; set; } = Hotkey.None;
+
+    /// <summary>Все назначенные горячие клавиши (для подавления в хуке).</summary>
+    public IEnumerable<Hotkey> Hotkeys()
+    {
+        yield return ConvertWordHotkey;
+        yield return ConvertSelectionHotkey;
+        yield return UndoHotkey;
+    }
+
     [JsonIgnore]
     public static string FilePath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
