@@ -24,6 +24,7 @@ public readonly record struct DetectionResult(
 public sealed class LayoutDetector
 {
     private readonly WordDictionary _dictionary;
+    private readonly NgramModel? _ngram;
 
     // Порог превосходства эвристики для авто-конвертации незнакомых слов.
     private const double HeuristicMargin = 25.0;
@@ -50,7 +51,11 @@ public sealed class LayoutDetector
         [Language.Ukrainian] = "іїєґ",
     };
 
-    public LayoutDetector(WordDictionary dictionary) => _dictionary = dictionary;
+    public LayoutDetector(WordDictionary dictionary, NgramModel? ngram = null)
+    {
+        _dictionary = dictionary;
+        _ngram = ngram;
+    }
 
     /// <summary>Решение для авто-режима: конвертировать ли и на какой язык.</summary>
     public DetectionResult Detect(string word, Language current)
@@ -109,7 +114,7 @@ public sealed class LayoutDetector
     }
 
     /// <summary>Оценка правдоподобия слова в языке (0..~115).</summary>
-    private static double Plausibility(string word, Language lang)
+    private double Plausibility(string word, Language lang)
     {
         string letters = ExtractLetters(word).ToLowerInvariant();
         if (letters.Length == 0) return 0;
@@ -118,7 +123,14 @@ public sealed class LayoutDetector
         string vowels = Vowels[lang];
 
         int inAlphabet = letters.Count(alphabet.Contains);
-        double score = 100.0 * inAlphabet / letters.Length;
+        double alphabetScore = 100.0 * inAlphabet / letters.Length;
+
+        // Биграммная модель (если словарь языка достаточно велик) уточняет оценку:
+        // осмысленные буквосочетания повышают правдоподобие, «мусорные» — понижают.
+        double score = alphabetScore;
+        double ngram = _ngram?.PlausibilityPercent(letters, lang) ?? -1;
+        if (ngram >= 0)
+            score = 0.5 * alphabetScore + 0.5 * ngram;
 
         bool hasVowel = letters.Any(vowels.Contains);
         if (!hasVowel && letters.Length >= 3)

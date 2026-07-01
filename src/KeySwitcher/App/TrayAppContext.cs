@@ -26,7 +26,8 @@ public sealed class TrayAppContext : ApplicationContext
     public TrayAppContext()
     {
         _settings = Settings.Load();
-        _detector = new LayoutDetector(WordDictionary.LoadEmbedded());
+        WordDictionary dictionary = WordDictionary.LoadEmbedded();
+        _detector = new LayoutDetector(dictionary, NgramModel.Build(dictionary));
         _switcher = new ManualSwitcher(_buffer, _detector);
 
         _ = _sync.Handle; // принудительно создаём хендл для BeginInvoke
@@ -125,7 +126,13 @@ public sealed class TrayAppContext : ApplicationContext
         }
 
         // Разделитель (пробел, пунктуация, цифра).
-        if (_settings.AutoModeEnabled && _buffer.CurrentWord.Length > 0)
+        // Авто-замену запускаем только по пробелу: так внутри-токенные разделители
+        // (точка/слэш/@/дефис в URL, e-mail, путях, числах) не рвут и не искажают токен,
+        // а в поле ввода пароля замена не срабатывает вовсе.
+        if (_settings.AutoModeEnabled
+            && char.IsWhiteSpace(c)
+            && _buffer.CurrentWord.Length > 0
+            && !InputContext.IsPasswordFieldFocused())
         {
             e.Suppress = true; // сами вставим разделитель после возможной конвертации
             char sep = c;

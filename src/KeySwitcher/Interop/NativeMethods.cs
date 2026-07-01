@@ -122,4 +122,38 @@ internal static class NativeMethods
         int cchBuff,
         uint wFlags,
         IntPtr dwhkl);
+
+    // ---- Определение поля ввода пароля (для исключения из авто-замены) ----
+    public const int GWL_STYLE = -16;
+    public const int ES_PASSWORD = 0x0020;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GUITHREADINFO
+    {
+        public int cbSize;
+        public uint flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT rcCaret;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 }

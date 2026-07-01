@@ -69,7 +69,7 @@ public sealed class ManualSwitcher
     {
         object? backup = ClipboardHelper.Save();
         string? selected = ClipboardHelper.CopySelection();
-        if (string.IsNullOrEmpty(selected))
+        if (string.IsNullOrEmpty(selected) || TextExclusions.ShouldSkip(selected))
         {
             ClipboardHelper.Restore(backup);
             return;
