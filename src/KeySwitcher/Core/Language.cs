@@ -35,4 +35,13 @@ public static class LanguageInfo
         Language.Ukrainian => "Українська",
         _ => lang.ToString(),
     };
+
+    /// <summary>Короткий код языка (ISO-639-1-подобный), используется в именах файлов словарей.</summary>
+    public static string Code(this Language lang) => lang switch
+    {
+        Language.English => "en",
+        Language.Russian => "ru",
+        Language.Ukrainian => "uk",
+        _ => "en",
+    };
 }
