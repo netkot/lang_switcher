@@ -34,4 +34,17 @@ public class NgramModelTests
             $"ожидалось, что осмысленное слово правдоподобнее мусора: {known} vs {garbage}");
         Assert.Equal(100, known);
     }
+
+    [Fact]
+    public void Backoff_GivesPartialCreditForUnseenTrigramWithSeenBigram()
+    {
+        // Обучаем на "abc"/"bcd". Слово "abd": триграммы ^^a,^ab знакомы (кредит 1),
+        // abd незнакома и биграмма "bd" тоже (0), bd$ незнакома, но биграмма "d$" знакома
+        // (откат 0.4). Итог: (1+1+0+0.4)/4 = 60%.
+        var model = NgramModel.Build(Dict("abc", "bcd"), reliableThreshold: 1);
+        double score = model.PlausibilityPercent("abd", Language.English);
+
+        Assert.Equal(60.0, score, precision: 6);
+        Assert.InRange(score, 0.1, 99.9); // строго между «мусором» и полным совпадением
+    }
 }
