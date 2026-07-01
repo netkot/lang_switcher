@@ -1,4 +1,5 @@
 using System.Text;
+using System.Windows.Automation;
 using static KeySwitcher.Interop.NativeMethods;
 
 namespace KeySwitcher.Interop;
@@ -7,11 +8,14 @@ namespace KeySwitcher.Interop;
 public static class InputContext
 {
     /// <summary>
-    /// true, если фокус ввода находится в классическом поле пароля (Edit со стилем
-    /// ES_PASSWORD). Best-effort: работает для Win32-полей (диалоги входа и т.п.);
-    /// для UWP/браузерных полей определить стиль нельзя — там вернёт false.
+    /// true, если фокус ввода находится в поле пароля. Сначала быстрый Win32-путь
+    /// (Edit со стилем ES_PASSWORD — диалоги входа), затем UI Automation
+    /// (IsPassword) — покрывает UWP-приложения и поля в браузерах.
     /// </summary>
-    public static bool IsPasswordFieldFocused()
+    public static bool IsPasswordFieldFocused() =>
+        IsWin32PasswordField() || IsUiaPasswordField();
+
+    private static bool IsWin32PasswordField()
     {
         try
         {
@@ -31,6 +35,24 @@ public static class InputContext
 
             long style = GetWindowLongPtr(gui.hwndFocus, GWL_STYLE).ToInt64();
             return (style & ES_PASSWORD) != 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// UI Automation: элемент в фокусе помечен как поле пароля (IsPassword). Кросс-процессный
+    /// вызов, поэтому используется только на пути авто-замены (редко). Любая ошибка → false.
+    /// </summary>
+    private static bool IsUiaPasswordField()
+    {
+        try
+        {
+            AutomationElement? focused = AutomationElement.FocusedElement;
+            if (focused is null) return false;
+            return focused.GetCurrentPropertyValue(AutomationElement.IsPasswordProperty) is true;
         }
         catch
         {
